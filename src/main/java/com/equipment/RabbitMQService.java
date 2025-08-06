@@ -2,6 +2,7 @@ package com.equipment;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeoutException;
 public class RabbitMQService {
     
     private static final Logger logger = LoggerFactory.getLogger(RabbitMQService.class);
+    private static final String EXCHANGE_NAME = "raw_equipment_events_exchange";
     private static final String QUEUE_NAME = "raw_equipment_events";
     private static final String RABBITMQ_HOST = "localhost";
     private static final int RABBITMQ_PORT = 5672;
@@ -48,9 +50,18 @@ public class RabbitMQService {
             connection = factory.newConnection();
             channel = connection.createChannel();
             
-            // Declare the queue
-            channel.queueDeclare(QUEUE_NAME, true, false, false, null);
-            logger.info("Queue '{}' declared successfully", QUEUE_NAME);
+            // 1. Declare the FANOUT exchange
+            // The BuiltinExchangeType.FANOUT ensures it ignores routing keys and broadcasts messages
+            channel.exchangeDeclare(EXCHANGE_NAME, BuiltinExchangeType.FANOUT, true); //durable exchange
+
+            // 2. Declare the queue
+            channel.queueDeclare(QUEUE_NAME, true, false, false, null); //durable queue
+
+            // 3. Bind the queue to the exchange
+            // For a fanout exchange, the routing key is ignored, so we use an empty string.
+            channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, "");
+
+            logger.info("Exchange & Queue '{}' declared successfully", EXCHANGE_NAME, QUEUE_NAME);
             
             // Verify queue exists
             try {
@@ -77,7 +88,7 @@ public class RabbitMQService {
     }
     
     /**
-     * Publishes an equipment event to the RabbitMQ queue.
+     * Publishes an equipment event to the RabbitMQ exchange queue.
      * @param event the equipment event to publish
      */
     public void publishEvent(EquipmentEvent event) throws Exception {
@@ -88,11 +99,11 @@ public class RabbitMQService {
         
         try {
             String message = objectMapper.writeValueAsString(event);
-            channel.basicPublish("", QUEUE_NAME, null, message.getBytes());
+            channel.basicPublish(EXCHANGE_NAME, "", null, message.getBytes());
             
             // Wait for confirmation
             if (channel.waitForConfirms(5000)) {
-                logger.info("Event confirmed published to queue '{}': {}", QUEUE_NAME, event);
+                logger.info("Event confirmed published to exchange queue '{}': {}", EXCHANGE_NAME, event);
             } else {
                 logger.error("Event publish confirmation timeout: {}", event);
             }

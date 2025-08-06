@@ -1,10 +1,10 @@
 # Equipment Event Publisher
 
-A Java Maven application that publishes equipment events to RabbitMQ. The application generates random equipment data and publishes it to a RabbitMQ queue named `raw_equipment_events`.
+A Java Maven application that publishes equipment events to RabbitMQ. The application generates random equipment data and publishes it to a RabbitMQ exchange queue (fanout type) named `raw_equipment_events_exchange`. Also it creates a durable queue named `raw_equipment_events` linked to the exchange.
 
 ## Features
 
-- Publishes equipment events every 1 second
+- Publishes equipment events every 1 second to an exchange queue. 
 - Supports 4 different equipment types with specific configurations:
   - **Equipment 1**: Temperature 50-70°C, Power 1
   - **Equipment 2**: Temperature 60-100°C, Power 1
@@ -74,6 +74,7 @@ The application uses the following default RabbitMQ configuration:
 - **Port**: 5672
 - **Username**: guest
 - **Password**: guest
+- **Exchange**: raw_equipment_events_exchange
 - **Queue**: raw_equipment_events
 
 To modify these settings, edit the constants in `RabbitMQService.java`.
