@@ -121,15 +121,21 @@ public class EventPublisher {
     private void updateOilLevels() {
         for (EquipmentConfig config : equipmentConfigs) {
             int equipmentId = config.getEquipmentId();
-            double currentOilLevel = equipmentOilLevels.get(equipmentId);
-            
-            // Generate random decrease between 1 and 3
-            double decrease = MIN_OIL_DECREASE + Math.random() * (MAX_OIL_DECREASE - MIN_OIL_DECREASE);
-            double newOilLevel = Math.max(0, currentOilLevel - decrease);
-            
-            equipmentOilLevels.put(equipmentId, newOilLevel);
-            logger.info("Updated oil level for equipment {}: {:.2f} -> {:.2f} (decrease: {:.2f})", 
-                       equipmentId, currentOilLevel, newOilLevel, decrease);
+
+            // The 'compute' method performs the get, modify, and put as a single, atomic operation for each key. 
+            // using compute here instead of classic 'get > modify > put', it avoid a race condition when the other
+            // thread get the oilLevel (race condition would be only a stale value when this thread is running). 
+            equipmentOilLevels.compute(equipmentId, (key, currentOilLevel) -> {
+                // currentOilLevel is the value passed by compute
+                // This entire lambda is executed atomically
+                double decrease = MIN_OIL_DECREASE + Math.random() * (MAX_OIL_DECREASE - MIN_OIL_DECREASE);
+                double newOilLevel = Math.max(0, currentOilLevel - decrease);
+                
+                logger.info("Updated oil level for equipment {}: {:.2f} -> {:.2f}", 
+                            equipmentId, currentOilLevel, newOilLevel);
+                
+                return newOilLevel;
+            });
         }
     }
     
